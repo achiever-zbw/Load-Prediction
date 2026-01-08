@@ -1,0 +1,22 @@
+# 路径配置
+
+paths:
+  raw_data_input: "data/raw/一个月数据总表.xlsx"
+  raw_data_target: "data/raw/一个月负荷数据总表.xlsx"
+  processed_data_dir: "data/processed/"
+  model_save_path: "models/checkpoints/best_model.pth"
+
+# 序列构建
+sequence_params:
+  time_steps: 10
+  batch_size: 32
+  train_split: 0.7
+  val_split: 0.2
+
+# 训练参数
+train_params:
+  epoch: 100
+  learning_rate: 0.001
+  save_path: "saved/checkpoints/best_model"
+
+

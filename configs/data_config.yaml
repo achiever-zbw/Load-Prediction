@@ -8,15 +8,21 @@ paths:
 
 # 序列构建
 sequence_params:
-  time_steps: 10
+  time_steps: 20
   batch_size: 32
   train_split: 0.7
   val_split: 0.2
 
 # 训练参数
 train_params:
-  epoch: 100
+  epoch: 500
   learning_rate: 0.001
-  save_path: "saved/checkpoints/best_model"
+  save_path: "saved/checkpoints/best_lstmtr_model"
 
+
+# 所有模型
+# LSTM , RNN , LSTM_Transformer 
+
+model_type:
+  LSTM
 

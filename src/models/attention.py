@@ -39,7 +39,7 @@ class ChannelAttentionBlock(nn.Module) :
 
         # 2. 学习得分
         e = self.score_layer(channel_status)
-        print(f"e : {e.shape}") # 32 , 3
+        # print(f"e : {e.shape}") # 32 , 3
 
         # 3. 得到归一化的注意力权重 , 根据最后一个维度 ， 即特征数 3
         # 得到三个特征的对应的权重, 注意拓展为 三维张量

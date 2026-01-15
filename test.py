@@ -6,6 +6,8 @@ from src.utils.get_config import load_config
 from src.data.pipeline import prepare_data_pipeline
 from src.models.lstm import LSTM
 from src.models.fusion_model import FusionModel
+from src.models.rnn import SimpleRNN
+from src.models.model_config import get_model
 
 def main():
     # 1. 加载配置与设备
@@ -15,13 +17,9 @@ def main():
     train_loader, val_loader, test_loader , data_process = prepare_data_pipeline(config)
     
     # 3. 加载模型架构
-    # model = LSTM(
-    #     input_size = 7 , hidden_size = 32 , num_layers = 2 , output_size = 1 , dropout_rate = 0.3
-    # ).to(device)
-
-    model = FusionModel(
-        input_size=7 , d_model=32 , n_head=2 , num_layers=2 , output_size=1 , dropout=0.2
-    ).to(device)
+    model_type = config["model_type"]
+    model = get_model(model_type).to(device)
+    print(f"采用模型为 : {model_type}")
     
     # 4. 加载训练好的权重参数
     save_path = config["train_params"]["save_path"]
@@ -46,7 +44,7 @@ def main():
     preds_original = data_process.target_scaler.inverse_transform(preds)
     trues_original = data_process.target_scaler.inverse_transform(trues)
 
-    # 7. 可视化对比
+    # 7. 可视化对比，实际数据与预测值比对
     plt.figure(figsize=(12, 6))
     plt.plot(trues_original[:200], label='Actual Load', color='blue', alpha=0.7)
     plt.plot(preds_original[:200], label='Predicted Load', color='red', linestyle='--')

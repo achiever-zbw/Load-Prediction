@@ -46,6 +46,12 @@ class SubwayDataset(Dataset) :
         raws_e = ["temp","hum"	,"wind"]
         raws_s = ["power",	"cw_temp", "chw_temp"]
         raws_r = ["pax"	, "status"	 , "fan_freq"	, "pump_freq"]
+
+        # 提取时间列，用于后续周期特征增强模块
+        raw_time_data = df_data["time"].values
+        # 将分钟数映射为时间步
+        self.time_index = (raw_time_data // 5).astype(int)
+
         # 2. 读取数据
         raw_e_data = df_data[raws_e].values
         raw_s_data = df_data[raws_s].values
@@ -88,7 +94,10 @@ class SubwayDataset(Dataset) :
         x_r = torch.tensor(self.input_seq_r[index]).float()
         target = torch.tensor(self.labels[index]).float()
 
-        return x_e , x_s , x_r , target
+        # 提取预测目标对应的时间索引 t
+        t_index = torch.tensor([self.time_index[index + 10]]).float()
+
+        return x_e , x_s , x_r , t_index , target
     
 
 class SubwayLoadModel(nn.Module) : 

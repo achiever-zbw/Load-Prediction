@@ -37,90 +37,108 @@ class SubwayDataset(Dataset) :
     """
     构造数据集，形状为 [10 , 6]  , [1, ]  , 表示，每一个窗口的长度为 10 ，6 个特征 ; 以及 1 个对应的预测值
     """
-    def __init__(self , time_step = 10):
+    def __init__(self , file_path , time_step = 10):
         # 1. 数据读取
-        df_data = pd.read_csv("./data/raw/一个月数据总表.csv" , thousands=",")
+        df_data = pd.read_csv(file_path , thousands=",")
         df_target = pd.read_csv("./data/raw/一个月负荷数据总表.csv" , thousands=",")
 
-        # 6 个特征列 和 1 个标签列
-        features_raws = ["passengers" , "structure_load" , "vent_load" , "temp" , "hum" , "equip_num"]
-        raw_data = df_data[features_raws].values
+        # 1. 特征分组，三类特征 E S R
+        raws_e = ["temp","hum"	,"wind"]
+        raws_s = ["power",	"cw_temp", "chw_temp"]
+        raws_r = ["pax"	, "status"	 , "fan_freq"	, "pump_freq"]
+        # 2. 读取数据
+        raw_e_data = df_data[raws_e].values
+        raw_s_data = df_data[raws_s].values
+        raw_r_data = df_data[raws_r].values
+
         raw_target = df_target[["total_load"]].values
 
-        # 2. 标准化
-        self.scaler_x = StandardScaler()
+        # 3. 标准化
+        self.scaler_e = StandardScaler()
+        self.scaler_s = StandardScaler()
+        self.scaler_r = StandardScaler()
+
+        scaler_e_data = self.scaler_e.fit_transform(raw_e_data)
+        scaler_s_data = self.scaler_s.fit_transform(raw_s_data)
+        scaler_r_data = self.scaler_r.fit_transform(raw_r_data)
+
         self.scaler_y = StandardScaler()
-        scaler_data = self.scaler_x.fit_transform(raw_data)
         scaler_target = self.scaler_y.fit_transform(raw_target)
 
-        # 3. 构建窗口
-        self.input_seq = create_sequences(scaler_data , time_step)
+        # 4. 构建窗口
+        self.input_seq_e = create_sequences(scaler_e_data , time_step)
+        self.input_seq_s = create_sequences(scaler_s_data , time_step)
+        self.input_seq_r = create_sequences(scaler_r_data , time_step)
+        # print(f"E 窗口 {self.input_seq_e.shape}")   # (8630, 10, 3)
+        # print(f"S 窗口 {self.input_seq_s.shape}")   # (8630, 10, 3)
+        # print(f"R 窗口 {self.input_seq_r.shape}")   # (8630, 10, 4)
         # 4. 构造标签窗口
         self.labels = scaler_target[time_step:]
 
     def __len__(self) : 
-        return len(self.input_seq)
+        return len(self.input_seq_e)
     
     # 每个 index 的 dataset 代表一个窗口，由 dataloader 打包后传入 SubwayLoadModel 进行特征的融合
     def __getitem__(self, index):
-        return torch.tensor(self.input_seq[index]).float() , torch.tensor(self.labels[index]).float()
+        """
+        返回 4 个数据，E S R Target
+        """
+        x_e = torch.tensor(self.input_seq_e[index]).float()
+        x_s = torch.tensor(self.input_seq_s[index]).float()
+        x_r = torch.tensor(self.input_seq_r[index]).float()
+        target = torch.tensor(self.labels[index]).float()
+
+        return x_e , x_s , x_r , target
     
 
 class SubwayLoadModel(nn.Module) : 
     """
-    特征融合嵌入模型，对应专利的步骤一 (多源数据采集与融合)
-    1. 特征的标准化 , 这里确保传入的数据已经进行标准化，在 SubwayDataset 中,这里特征和标签（负荷值）都进行了标准化
-    2. 每种输入特征(对应多个通道) 通过线性映射进行通道嵌入 。 通过 FeaturesCatBlock 中 Linear 实现，1 -> 32 维度的映射
-    3. 每个特征在嵌入后都会进行层归一化、激活函数处理。 通过 FeaturesCatBlock 中的 LayerNorm 和 Tanh 实现
-    4. 通过将不同通道的嵌入特征进行拼接，生成统一的向量 。 通过 FeaturesCatBlock 中的 torch.cat 实现
-
-    数据形状的转变 ：
-    - 1. 首先加载一个月的数据, [8640 , 6] , 表示 8640 个时间点，每个时间点的 6 个特征
-    - 2. 构建窗口。选择窗口的长度为 10 ，则一共有 8630 个窗口，所以数据变为 [8630 , 10 , 6] , 每个 Dataset 代表一个窗口的数据，
-         为 [10 , 6]
-    - 3. 把 Dataset 进行打包，一共 8630 个窗口，使用 batch_size = 32 进行批次打包，形状为 [32 , 10 , 6]
-    - 4. 先不关心 batch_size , 对于每个 [10 , 6]，FeaturesCatBlock 需要对 6 个特征进行拼接，所以要切割成 6 个 [10 , 1] 的形式
-    - 5. 对 6 个 [32 , 10 , 1] 进行特征拼接 ， 首先 Linear , 形状变为 [32 , 10 , 32]
-    - 6. 再归一化瘀激活函数，形状不变
-    - 7. 最后对 6 个特征拼接，形状变为 [32 , 10 , 32 * 6] -> [32 , 10 , 192]
+    通道嵌入与特征融合模型，总流程 : 
+    - 1. 共三个特征，E(环境) , S(系统) , R(工况) , 对应 3 3 4 个子特征，即通道
+    - 2. 首先进行每种输入特征（对应多个通道）通过线性映射进行通道嵌入
+        - 首先读取数据，按照三个分类进行读取，大小分别为 [8640 , 3] [8640 , 3] [8640 , 4]
+        - 进行标准化，将三组特征进行标准化，统一量纲 ，通过 SubwayDataset 里的 StandardScaler() 实现
+        - 构建窗口，以 10 为步长，对三个特征分别构建窗口，得到 [8630 , 10 , 3] [8630 , 10 , 3] [8630 , 10 , 4] 
+        - 三组数据进行批次 32 打包，构建出 [32 , 10 , 3] [32 , 10 , 3] [32 , 10 , 4]
+        - 将 3 个特征进行各自的线性映射，实现通道的嵌入 。得到 [32 , 10 , 64] [32 , 10 , 64] [32 , 10 , 64]
+        - 嵌入后进行层归一化和激活函数处理
+        - 将 嵌入特征进行拼接，生成统一的特征向量 Z(concat) ，形状为 [32 , 10 , 192]
+    
     """
 
-    def __init__(self , num_features = 6 , dim = 32) :
+    def __init__(self , dim = 64 , time_step = 10) :
         super().__init__()
-        self.fusion_model = FeaturesCatBlock(num_features , dim)
+        self.fusion_model = FeaturesCatBlock(dim)
 
-    def forward(self , x) : 
+    def forward(self , x_e , x_s , x_r) : 
         """
-        x 是从 DataLoader 传入的数据，[batch_size , 10 , 6]
+        x 是从 DataLoader 传入的数据，[batch_size , 10 , num_features] , e s r 分别为 3 3 4 
         
         :param self: 说明
         :param x: 说明
         """
-        # 把 [10 , 6] 切割成 6 个 [10 * 1] , 这样才能进行 6 个特征的融合
-        x_list = [x[:, :, i : i + 1] for i in range(x.shape[-1])] 
         # 特征嵌入与融合,执行了 linear -> LayerNorm -> Tanh -> Cat
-        fusion_data = self.fusion_model(x_list)
+        fusion_data = self.fusion_model(x_e , x_s , x_r)
         return fusion_data
 
 
 if __name__ == '__main__' : 
     # print(30 * 24 * 12)
 
-    dataset = SubwayDataset()
-    print(len(dataset)) # 8630
-    x , y = dataset[0]
-    # 每一个块都划分成 10 * 6 
-    print(x.shape)  # torch.Size([10 , 6])
-    print(y.shape)  # torch.Size([1])
+    dataset = SubwayDataset(file_path="data/processed/一个月数据总表_10特征.csv")
+    print(len(dataset))
 
+    x_e , x_s , x_r , target = dataset[0]
+    print(f"x_e 的shape : {x_e.shape}")  
+    print(f"x_s 的shape : {x_s.shape}")   
+    print(f"x_r 的shape : {x_r.shape}")  
 
-    model = SubwayLoadModel(6 , 32)
+    model = SubwayLoadModel(64 , 10)
     
     load_data = DataLoader(dataset , 32 , True)
-    batch_x, batch_y = next(iter(load_data))
+    batch_e , batch_s , batch_r , y = next(iter(load_data))
     
-    fusion_data = model(batch_x)
+    fusion_data = model(batch_e , batch_s , batch_r)
     
     # 6. 验证结果
-    print(f"输入 Batch 形状: {batch_x.shape}")    # torch.Size([32, 10, 6])
     print(f"融合后的特征向量形状: {fusion_data.shape}") # torch.Size([32, 10, 192])

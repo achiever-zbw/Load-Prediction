@@ -25,3 +25,29 @@ class LSTM(nn.Module) :
         out = self.dropout(out)
         out = self.fc(out)
         return out
+    
+class LSTMBlock(nn.Module) : 
+    """
+    短时序建模层 , 两层 LSTM 建模
+    """
+    def __init__(self , input_dim , hidden_dim ) : 
+        super().__init__()
+        self.lstm1 = nn.LSTM(
+            input_size=input_dim , hidden_size=hidden_dim , batch_first=True
+        )
+        self.lstm2 = nn.LSTM(
+            input_size=hidden_dim , hidden_size=hidden_dim , batch_first=True
+        )
+    
+    def forward(self , x) : 
+        """
+        x : [batch_size , 10 , 3]
+        """
+        # h1 = LSTM1(x)
+        out1 , _ = self.lstm1(x)
+        # h2 = LSTM2(h1)
+        out2 , (h_n2 , c_n2) = self.lstm2(out1)
+        # 取最后一个时间步
+        final_feature = out2[ : , - 1 ,  :]
+
+        return final_feature

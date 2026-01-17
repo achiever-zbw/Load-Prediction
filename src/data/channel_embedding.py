@@ -19,7 +19,7 @@ class FeatureEmbeddingBlock(nn.Module) :
         # 层归一化
         self.layer_norm = nn.LayerNorm(output_dim)
         # 激活函数
-        self.activation = nn.Tanh()
+        self.activation = nn.ReLU()
 
     def forward(self , x) : 
         """

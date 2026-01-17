@@ -1,5 +1,6 @@
 import pandas as pd
 import torch
+import numpy as np
 from torch.utils.data import TensorDataset , DataLoader , Dataset
 import torch.nn as nn
 from sklearn.preprocessing import StandardScaler
@@ -33,72 +34,52 @@ def data_split(datas , train_size , val_size , test_size) :
     return train_data , val_data , test_data
 
 
+
 class SubwayDataset(Dataset) : 
     """
     构造数据集，形状为 [10 , 6]  , [1, ]  , 表示，每一个窗口的长度为 10 ，6 个特征 ; 以及 1 个对应的预测值
     """
-    def __init__(self , file_path , time_step = 10):
-        # 1. 数据读取
-        df_data = pd.read_csv(file_path , thousands=",")
-        df_target = pd.read_csv("./data/raw/一个月负荷数据总表.csv" , thousands=",")
+    def __init__(self , data_e , data_s , data_r , time_index , targets , time_step):
+        """
+        初始化数据集
+        
+        :param self: 说明
+        :param data_e: 环境特征 [N , 3]
+        :param data_s: 系统特征 [N , 3]
+        :param data_r: 工况特征 [N , 4]
+        :param time_index: 时间索引 , [N , ] -> 用于周期增强
+        :param targets: 目标负荷数据 [N , 1]
+        :param time_step: 窗口长度
+        """
+        
+        self.time_step = time_step
+        self.data_e = data_e
+        self.data_s = data_s
+        self.data_r = data_r
+        self.time_index = time_index
+        self.targets = targets
 
-        # 1. 特征分组，三类特征 E S R
-        raws_e = ["temp","hum"	,"wind"]
-        raws_s = ["power",	"cw_temp", "chw_temp"]
-        raws_r = ["pax"	, "status"	 , "fan_freq"	, "pump_freq"]
-
-        # 提取时间列，用于后续周期特征增强模块
-        raw_time_data = df_data["time"].values
-        # 将分钟数映射为时间步
-        self.time_index = (raw_time_data // 5).astype(int)
-
-        # 2. 读取数据
-        raw_e_data = df_data[raws_e].values
-        raw_s_data = df_data[raws_s].values
-        raw_r_data = df_data[raws_r].values
-
-        raw_target = df_target[["total_load"]].values
-
-        # 3. 标准化
-        self.scaler_e = StandardScaler()
-        self.scaler_s = StandardScaler()
-        self.scaler_r = StandardScaler()
-
-        scaler_e_data = self.scaler_e.fit_transform(raw_e_data)
-        scaler_s_data = self.scaler_s.fit_transform(raw_s_data)
-        scaler_r_data = self.scaler_r.fit_transform(raw_r_data)
-
-        self.scaler_y = StandardScaler()
-        scaler_target = self.scaler_y.fit_transform(raw_target)
-
-        # 4. 构建窗口
-        self.input_seq_e = create_sequences(scaler_e_data , time_step)
-        self.input_seq_s = create_sequences(scaler_s_data , time_step)
-        self.input_seq_r = create_sequences(scaler_r_data , time_step)
-        # print(f"E 窗口 {self.input_seq_e.shape}")   # (8630, 10, 3)
-        # print(f"S 窗口 {self.input_seq_s.shape}")   # (8630, 10, 3)
-        # print(f"R 窗口 {self.input_seq_r.shape}")   # (8630, 10, 4)
-        # 4. 构造标签窗口
-        self.labels = scaler_target[time_step:]
+        # 可用的样本数
+        self.num_samples = len(targets) - time_step
 
     def __len__(self) : 
-        return len(self.input_seq_e)
+        return self.num_samples
     
     # 每个 index 的 dataset 代表一个窗口，由 dataloader 打包后传入 SubwayLoadModel 进行特征的融合
     def __getitem__(self, index):
         """
-        返回 4 个数据，E S R Target
+        根据索引构建窗口
         """
-        x_e = torch.tensor(self.input_seq_e[index]).float()
-        x_s = torch.tensor(self.input_seq_s[index]).float()
-        x_r = torch.tensor(self.input_seq_r[index]).float()
-        target = torch.tensor(self.labels[index]).float()
+        x_e = torch.from_numpy(self.data_e[index : index + self.time_step]).float()
+        x_s = torch.from_numpy(self.data_s[index : index + self.time_step]).float()
+        x_r = torch.from_numpy(self.data_r[index : index + self.time_step]).float()
 
-        # 提取预测目标对应的时间索引 t
-        t_index = torch.tensor([self.time_index[index + 10]]).float()
+        # 提取目标值
+        target = torch.from_numpy(np.array(self.targets[index + self.time_step])).float()
+        # 返回整个窗口的时间索引序列，形状: [time_step]
+        t_idx = torch.from_numpy(self.time_index[index : index + self.time_step]).float()
 
-        return x_e , x_s , x_r , t_index , target
-    
+        return x_e , x_s , x_r , t_idx , target
 
 class SubwayLoadModel(nn.Module) : 
     """
@@ -115,13 +96,13 @@ class SubwayLoadModel(nn.Module) :
     
     """
 
-    def __init__(self , dim = 64 , time_step = 10) :
+    def __init__(self , dim = 64 , time_step = 24) :
         super().__init__()
         self.fusion_model = FeaturesCatBlock(dim)
 
     def forward(self , x_e , x_s , x_r) : 
         """
-        x 是从 DataLoader 传入的数据，[batch_size , 10 , num_features] , e s r 分别为 3 3 4 
+        x 是从 DataLoader 传入的数据，[batch_size , time_step , num_features] , e s r 分别为 3 3 4 
         
         :param self: 说明
         :param x: 说明
@@ -131,23 +112,25 @@ class SubwayLoadModel(nn.Module) :
         return fusion_data
 
 
-if __name__ == '__main__' : 
-    # print(30 * 24 * 12)
-
-    dataset = SubwayDataset(file_path="data/processed/一个月数据总表_10特征.csv")
-    print(len(dataset))
-
-    x_e , x_s , x_r , target = dataset[0]
-    print(f"x_e 的shape : {x_e.shape}")  
-    print(f"x_s 的shape : {x_s.shape}")   
-    print(f"x_r 的shape : {x_r.shape}")  
-
-    model = SubwayLoadModel(64 , 10)
+class NoneChannelAttnDataset(Dataset) : 
+    """
+    不需要特征分类，直接使用 10 个特征
+    """
+    def __init__(self , data_x, time_index , targets , time_step) : 
+        self.time_step = time_step
+        self.data_x = data_x
+        self.targets = targets
+        self.time_index = time_index
+        self.num_samples = len(data_x) - time_step
     
-    load_data = DataLoader(dataset , 32 , True)
-    batch_e , batch_s , batch_r , y = next(iter(load_data))
+    def __len__(self) : 
+        return self.num_samples
     
-    fusion_data = model(batch_e , batch_s , batch_r)
-    
-    # 6. 验证结果
-    print(f"融合后的特征向量形状: {fusion_data.shape}") # torch.Size([32, 10, 192])
+    def __getitem__(self, index):
+        # 返回时间窗口：[index : index + time_step]
+        x = torch.from_numpy(self.data_x[index : index + self.time_step]).float()
+        # 提取目标值（与 SubwayDataset 保持一致）
+        target = torch.from_numpy(np.array(self.targets[index + self.time_step])).float()
+        t_idx = torch.tensor([self.time_index[index + self.time_step]]).float()
+
+        return x, target, t_idx

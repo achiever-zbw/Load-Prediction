@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import math
 from .lstm import LSTMBlock
-from .cyclenet import RecurrentCycle
 
 class PeriodEnhanceBlock(nn.Module) :
     """
@@ -46,7 +45,7 @@ class PeriodEnhanceDayWeekBlock(nn.Module) :
     - 日周期 : 24 * 12 = 288 个点
     - 周周期 : 7
     """
-    def __init__(self , hidden_dim = 64 , time_step = 24) :
+    def __init__(self , hidden_dim = 64 , time_step = 288) :
         super().__init__()
         self.day_steps = 288
         self.week_steps = 7
@@ -111,11 +110,4 @@ class PeriodEnhanceDayWeekBlock(nn.Module) :
         # 与 LSTM 融合
         h_sp = h2 + period_feature_enhance
         return h_sp
-    
-
-class CycleNetPeriodBlock(nn.Module) : 
-    """
-    基于 CycleNet 的周期特征增强模块
-    """
-
-    
+ 

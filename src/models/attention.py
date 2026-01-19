@@ -68,7 +68,7 @@ class TransformerBlock(nn.Module) :
     """
     长期依赖建模层 , 使用Transformer编码器对增强后的特征 H_sp 进行建模，捕捉冷负荷序列中的长期依赖关系
     """
-    def __init__(self , dim = 64 , nhead = 4 , num_layer = 3 ) : 
+    def __init__(self , dim = 64 , nhead = 4 , num_layer = 2 ) : 
         super().__init__()
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=dim ,

@@ -107,11 +107,12 @@ def main() :
         day_of_week=day_of_week[train_size:] , targets=data_y[train_size:] , time_step=576
     )
 
+
     train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True)
     val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 
     # 4. model 初始化
-    model = MainModel(dim=64 , time_step=576).to(device)
+    model = MainModel(dim=64 , time_step=24).to(device)
     loss_fn = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters() , lr=0.0005)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer , 'min' , patience=5 , factor=0.5)

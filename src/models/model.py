@@ -11,7 +11,7 @@ class MainModel(nn.Module) :
     """
     冷负荷预测模型
     """
-    def __init__(self , dim = 64 , time_step = 576) :
+    def __init__(self , dim = 64 , time_step = 24) :
         super().__init__()
         self.time_step = time_step
         self.name = "MainModel"
@@ -69,11 +69,11 @@ class MainModel(nn.Module) :
 
         
 
-class NoneChannelAttnModel(nn.Module) : 
+class NoneChannelAttnModel(nn.Module) :
     """
     无通道注意力的影响，直接传入 [B , time_step , 10] 的特征向量
     """
-    def __init__(self , dim = 64 , time_step = 24) : 
+    def __init__(self , dim = 64 , time_step = 24) :
         super().__init__()
         self.name = "无通道注意力模型"
         self.time_step = time_step
@@ -159,3 +159,25 @@ class NoneChannelTransAttnModel(nn.Module) :
         output = self.output_layer(trans_out)
         return output
     
+
+class NonePeriodModel(nn.Module) :
+    """
+    无周期特征编码
+    """
+    def __init__(self , dim = 64 , time_step = 24) : 
+        super().__init__()
+        self.name = "无周期特征模型"
+        self.time_step = time_step
+        self.layer1 = nn.Linear(in_features=10 , out_features=dim * 2)
+        self.channel_attention = ChannelAttentionBlock(in_channels=dim * 2)
+        self.lstm = LSTMBlock(input_dim=dim * 2 , hidden_dim=dim)
+        self.transformer = TransformerBlock(dim = 64 , nhead=4 , num_layer=2)
+        self.output_layer = TaskOutPutBlock(dim=64)
+
+    def forward(self , x) : 
+        x = self.layer1(x)
+        x = self.channel_attention(x)
+        x = self.lstm(x)
+        x = self.transformer(x)
+        output = self.output_layer(x)
+        return output

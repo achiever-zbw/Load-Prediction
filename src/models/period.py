@@ -45,7 +45,7 @@ class PeriodEnhanceDayWeekBlock(nn.Module) :
     - 日周期 : 24 * 12 = 288 个点
     - 周周期 : 7
     """
-    def __init__(self , hidden_dim = 64 , time_step = 288) :
+    def __init__(self , hidden_dim = 64 , time_step = 24) :
         super().__init__()
         self.day_steps = 288
         self.week_steps = 7

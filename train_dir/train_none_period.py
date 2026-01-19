@@ -1,9 +1,9 @@
-# 无通道嵌入、特征权重融合的 MainModel 训练
+# 无周期特征增强的训练
 import os
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader , Subset , Dataset 
-from src.models.model import NoneChannelAttnModel
+from src.models.model import NonePeriodModel
 from src.data.dataset import DatasetProvideWeek
 import random
 import matplotlib.pyplot as plt
@@ -22,8 +22,8 @@ def train_one_epoch(model , train_loader , loss_fn , optimizer , device) :
         batch_t = batch_t.to(device)
         batch_w = batch_w.to(device)
 
-        # 前向传播
-        main_output = model(batch_x , batch_t , batch_w)
+        # 前向传播，这里只接受 x
+        main_output = model(batch_x)
         loss_main = loss_fn(main_output , targets)
 
         # 反向传播
@@ -42,7 +42,7 @@ def train_one_epoch(model , train_loader , loss_fn , optimizer , device) :
 def main() : 
     # 1. 配置与环境
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    save_path = "saved/checkpoints/best_none_channel_main_model.pth"
+    save_path = "saved/checkpoints/best_none_period_model.pth"
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
     # 2. 数据准备
@@ -69,7 +69,7 @@ def main() :
     scaler_y.fit(df_targets[["total_load_hvac"]].iloc[:train_size])
 
     # 保存 Scaler (未来推理时必须使用训练时的均值和方差)
-    scaler_dir = os.path.join("saved/scaler/none_channel_main")
+    scaler_dir = os.path.join("saved/scaler/none_period")
     os.makedirs(scaler_dir, exist_ok=True)
     joblib.dump(scaler_x, os.path.join(scaler_dir, "scaler_x.pkl"))
     joblib.dump(scaler_y, os.path.join(scaler_dir, "scaler_y.pkl"))
@@ -97,7 +97,7 @@ def main() :
     val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 
     # 4. model 初始化
-    model = NoneChannelAttnModel(dim=64 , time_step=24).to(device)
+    model = NonePeriodModel(dim=64 , time_step=24).to(device)
     loss_fn = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters() , lr=0.0005)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer , 'min' , patience=5 , factor=0.5)
@@ -117,10 +117,9 @@ def main() :
         model.eval()
         val_loss = 0.0
         with torch.no_grad() :
-            for bx , targets , bt in val_dataloader :
+            for bx , targets , _ , _  in val_dataloader :
                 bx = bx.to(device)
-                bt = bt.to(device)
-                output = model(bx , bt)
+                output = model(bx )
                 val_loss += loss_fn(output , targets.to(device)).item()
 
         avg_val_loss = val_loss / len(val_dataloader)
@@ -151,7 +150,7 @@ def main() :
     plt.tight_layout()
 
     # 保存图像
-    loss_curve_path = 'saved/none_channel_main_loss_curve.png'
+    loss_curve_path = 'saved/none_period_loss_curve.png'
     os.makedirs(os.path.dirname(loss_curve_path), exist_ok=True)
     plt.savefig(loss_curve_path, dpi=300, bbox_inches='tight')
     print(f"\nLoss 曲线已保存至: {loss_curve_path}")

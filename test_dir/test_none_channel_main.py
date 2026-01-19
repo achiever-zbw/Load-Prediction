@@ -37,12 +37,12 @@ def main():
 
     time_index = (df_features["time"].values // 5) % 288
 
-    # 4. 构建测试集 
+    # 4. 构建测试集
     test_dataset = NoneChannelAttnDataset(
-        data_x=data_x , 
+        data_x=data_x ,
         time_index=time_index ,
-        targets=data_y , 
-        time_step=288
+        targets=data_y ,
+        time_step=24
     )
 
     test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)

@@ -42,7 +42,7 @@ def main():
         data_x=data_x , 
         time_index=time_index ,
         targets=data_y , 
-        time_step=24
+        time_step=288
     )
 
     test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)

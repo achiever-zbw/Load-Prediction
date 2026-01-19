@@ -60,7 +60,7 @@ def main() :
 
     # 划分训练集 验证集
     total_len = len(df_features)
-    train_size = int(0.8 * total_len)
+    train_size = int(0.5 * total_len)
 
     # 归一化处理
     scaler_x = StandardScaler()

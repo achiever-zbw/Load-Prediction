@@ -58,11 +58,12 @@ def main() :
     
     # 划分训练集 验证集
     total_len = len(df_features)
-    train_size = int(0.8 * total_len)
+    train_size = int(0.5 * total_len)
 
     # 归一化处理
     scaler_x = StandardScaler()
     scaler_y = StandardScaler()
+
     # 注意，只在训练集上 fit ！
     scaler_x.fit(df_features[raws].iloc[:train_size])
     scaler_y.fit(df_targets[["total_load_hvac"]].iloc[:train_size])
@@ -84,12 +85,12 @@ def main() :
     # 5. 实例化 Dataset (此时 Dataset 接收的是 numpy 数组)
     train_dataset = DatasetProvideWeek(
         data_x=data_x[:train_size] , time_index=time_index[:train_size] ,
-        day_of_week=day_of_week[:train_size] , targets=data_y[:train_size] , time_step=24
+        day_of_week=day_of_week[:train_size] , targets=data_y[:train_size] , time_step=288
     )
 
     val_dataset = DatasetProvideWeek(
         data_x=data_x[train_size:] , time_index=time_index[train_size:] ,
-        day_of_week=day_of_week[train_size:] , targets=data_y[train_size:] , time_step=24
+        day_of_week=day_of_week[train_size:] , targets=data_y[train_size:] , time_step=288
     )
 
     train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True)

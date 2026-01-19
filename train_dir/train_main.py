@@ -99,12 +99,12 @@ def main() :
 
     train_dataset = DatasetProvideWeek(
         data_x=data_x[:train_size] , time_index=time_index[:train_size] ,
-        day_of_week=day_of_week[:train_size] , targets=data_y[:train_size] , time_step=576
+        day_of_week=day_of_week[:train_size] , targets=data_y[:train_size] , time_step=24
     )
 
     val_dataset = DatasetProvideWeek(
         data_x=data_x[train_size:] , time_index=time_index[train_size:] ,
-        day_of_week=day_of_week[train_size:] , targets=data_y[train_size:] , time_step=576
+        day_of_week=day_of_week[train_size:] , targets=data_y[train_size:] , time_step=24
     )
 
 

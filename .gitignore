@@ -93,3 +93,8 @@ dmypy.json
 
 # Configuration (uncomment if you don't want to share local configs)
 # configs/local_config.yaml
+
+
+/docs
+
+/saved

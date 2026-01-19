@@ -15,7 +15,7 @@ class ChannelAttentionBlock(nn.Module) :
     - 4. 将权重与原始特征对应元素相乘得到加权的特征 , [32 , 10 , 192]
     - 5. 将通道压缩，192 -> 3 ，回到 3 个特征阶段，[32 , 10 , 3]
     """
-    def __init__(self , in_channels = 192) :
+    def __init__(self , in_channels) :
         super().__init__()
         # 学习各个通道的得分层
         self.score_layer = nn.Sequential(
@@ -28,7 +28,7 @@ class ChannelAttentionBlock(nn.Module) :
        
     def forward(self , x) :
         """
-        x : [batch_size , time_step , 192]
+        x : [batch_size , time_step , 192] 
         
         :param self: 说明
         :param x: 说明

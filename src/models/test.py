@@ -3,6 +3,7 @@ from src.data.dataset import SubwayDataset , SubwayLoadModel
 from torch.utils.data import DataLoader
 from .attention import ChannelAttentionBlock
 from .period import PeriodEnhanceBlock
+from .model import MainModel
 
 if __name__ == '__main__' : 
     # print(30 * 24 * 12)
@@ -43,3 +44,12 @@ if __name__ == '__main__' :
     period_model = PeriodEnhanceBlock(64)
     h_sp = period_model(h2 , batch_t)
     print(f"LSTM 的输出融合了周期特征后 : {h_sp.shape}")
+
+    # 6. 整合全流程模型测试
+    print("\n" + "="*20 + " 完整模型测试 " + "="*20)
+
+    # MainModel
+    main_model = MainModel(dim=64, time_step=10)
+    output = main_model(batch_e , batch_s , batch_r , batch_t)
+    print(f"测试输出的形状 : {output.shape}")
+     

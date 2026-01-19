@@ -75,7 +75,7 @@ class SubwayDataset(Dataset) :
         x_r = torch.from_numpy(self.data_r[index : index + self.time_step]).float()
 
         # 提取目标值
-        target = torch.from_numpy(np.array(self.targets[index + self.time_step])).float()
+        target = torch.from_numpy(self.targets[index + self.time_step]).float()
         # 返回整个窗口的时间索引序列，形状: [time_step]
         t_idx = torch.from_numpy(self.time_index[index : index + self.time_step]).float()
 
@@ -121,7 +121,7 @@ class NoneChannelAttnDataset(Dataset) :
         self.data_x = data_x
         self.targets = targets
         self.time_index = time_index
-        self.num_samples = len(data_x) - time_step
+        self.num_samples = len(targets) - time_step
     
     def __len__(self) : 
         return self.num_samples
@@ -130,7 +130,95 @@ class NoneChannelAttnDataset(Dataset) :
         # 返回时间窗口：[index : index + time_step]
         x = torch.from_numpy(self.data_x[index : index + self.time_step]).float()
         # 提取目标值（与 SubwayDataset 保持一致）
-        target = torch.from_numpy(np.array(self.targets[index + self.time_step])).float()
-        t_idx = torch.tensor([self.time_index[index + self.time_step]]).float()
+        target = torch.from_numpy(self.targets[index + self.time_step]).float()
+        t_idx = torch.from_numpy(self.time_index[index : index + self.time_step]).float()
 
         return x, target, t_idx
+    
+
+class DatasetProvideWeek(Dataset) :
+    """
+    提供星期几信息的 Dataset，用于支持日周期 + 周周期的特征增强
+    返回: x, target, t_index, day_of_week
+    """
+    def __init__(self, data_x, time_index, day_of_week, targets, time_step):
+        """
+        初始化数据集
+
+        :param data_x: 特征数据 [N, num_features]
+        :param time_index: 日时间索引 (0-287)，表示一天中的第几个5分钟点 [N]
+        :param day_of_week: 周时间索引 (0-6)，0=周一, 6=周日 [N]
+        :param targets: 目标负荷数据 [N]
+        :param time_step: 时间窗口长度
+        """
+        self.time_step = time_step
+        self.data_x = data_x
+        self.targets = targets
+        self.time_index = time_index
+        self.day_of_week = day_of_week
+        self.num_samples = len(targets) - time_step
+
+    def __len__(self):
+        return self.num_samples
+
+    def __getitem__(self, index):
+        """
+        返回一个时间窗口的数据
+
+        :return: x [time_step, num_features]
+                 target [1]
+                 t_idx [time_step] - 日时间索引
+                 day_of_week [time_step] - 周时间索引
+        """
+        # 特征窗口
+        x = torch.from_numpy(self.data_x[index : index + self.time_step]).float()
+
+        # 目标值（预测窗口后的下一个时刻）
+        target = torch.from_numpy(self.targets[index + self.time_step]).float()
+
+        # 日时间索引窗口
+        t_idx = torch.from_numpy(self.time_index[index : index + self.time_step]).float()
+
+        # 周时间索引窗口
+        dow = torch.from_numpy(self.day_of_week[index : index + self.time_step]).float()
+
+        return x, target, t_idx, dow
+
+
+class CycleNetDataset(Dataset) : 
+    """
+     x: (batch_size, seq_len, enc_in), cycle_index: (batch_size,)
+    支持 CycleNet 模型的数据集构建，生成负荷的 [B , time_step , channel] , 以及 time_index : [B , ]
+    """
+    def __init__(self , load_data ,  time_index , time_step = 24 , cycle_len = 288):
+        super().__init__()
+        self.load_data = load_data
+        self.time_index = time_index
+        self.time_step = time_step
+        self.cycle_len = cycle_len
+        self.num_samples = len(self.load_data) - time_step
+
+    def __len__(self) : 
+        return self.num_samples
+
+    def __getitem__(self, index):
+        # 确保 load_data 是 1 维的
+        if self.load_data.ndim == 2:
+            data = self.load_data.reshape(-1)
+        else:
+            data = self.load_data
+
+        # 1. 提取输入序列: [time_step] -> [time_step, 1]
+        x_seq = data[index : index + self.time_step]
+        x = torch.from_numpy(x_seq).float().unsqueeze(-1)
+
+        # 2. 提取目标值: [1]
+        target_val = data[index + self.time_step]
+        target = torch.tensor([target_val], dtype=torch.float32)
+
+        # 3. 计算周期索引（除以5转换为点索引）
+        start_time_idx = self.time_index[index]
+        cycle_index = int((start_time_idx / 5) % self.cycle_len)
+        cycle_index = torch.tensor([cycle_index], dtype=torch.long)
+
+        return x, target, cycle_index

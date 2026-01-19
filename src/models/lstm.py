@@ -42,7 +42,7 @@ class LSTMBlock(nn.Module) :
     
     def forward(self , x) : 
         """
-        x : [batch_size , time_step , 64]
+        x : [batch_size , time_step , 192]
         """
         # h1 = LSTM1(x)
         out1 , _ = self.lstm1(x)

@@ -19,7 +19,7 @@ scaler_dir = "saved/scaler"
 def main():
     # 1. 设备、环境配置
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    time_step = 288
+    time_step = 576
 
     # 2. 读取测试数据（直接使用专门的测试文件）
     df_features = pd.read_csv("data/processed/test_shifted.csv")
@@ -48,7 +48,7 @@ def main():
 
     # 4. 构建测试数据集（使用全部测试数据，不需要划分）
     test_dataset = DatasetProvideWeek(
-        data_x=data_x , time_index=time_index , day_of_week=day_of_week , targets=data_y , time_step=288
+        data_x=data_x , time_index=time_index , day_of_week=day_of_week , targets=data_y , time_step=576
     )
 
     test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)

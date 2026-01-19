@@ -7,11 +7,11 @@ from src.models.period import PeriodEnhanceBlock , PeriodEnhanceDayWeekBlock
 from src.models.output import TaskOutPutBlock
 from src.data.dataset import SubwayLoadModel
 
-class MainModel(nn.Module) : 
+class MainModel(nn.Module) :
     """
     冷负荷预测模型
     """
-    def __init__(self , dim = 64 , time_step = 288) :
+    def __init__(self , dim = 64 , time_step = 576) :
         super().__init__()
         self.time_step = time_step
         self.name = "MainModel"
@@ -24,7 +24,7 @@ class MainModel(nn.Module) :
         self.lstm = LSTMBlock(input_dim = dim * 2 , hidden_dim = dim)
         # 周期特征增强模块
         # self.period = PeriodEnhanceBlock(hidden_dim=64, time_step=time_step)
-        self.period = PeriodEnhanceDayWeekBlock(hidden_dim=64 , time_step=288)
+        self.period = PeriodEnhanceDayWeekBlock(hidden_dim=64 , time_step=time_step)
         # 长期依赖建模
         self.transformer = TransformerBlock(dim=64, nhead=4 , num_layer=2)
         # 多任务输出

@@ -31,47 +31,21 @@ class FeatureEmbeddingBlock(nn.Module) :
         return x
     
 
-# class FeaturesCatBlock(nn.Module) : 
-#     """
-#     特征拼接模块 ，将 6 个特征进行拼接
-#     """
-#     def __init__(self , num_features = 6 , dim = 32) :
-#         super().__init__()
-#         # 将 6 个特征向量集合在一个 List 中
-#         self.embeddings = nn.ModuleList([
-#             FeatureEmbeddingBlock(1 , dim ) for i in range(num_features)
-#         ])
-
-#     def forward(self , x_list) : 
-#         """
-#         x_list : 包含 6 个向量的列表，每个向量的形状 [batch_size , length , 1]
-        
-#         :param self: 说明
-#         :param x_list: 说明
-#         """
-#         embedded_features = []
-#         for i , block in enumerate(self.embeddings) : 
-#             embedded_features.append(block(x_list[i]))
-        
-#         # 拼接
-#         features_cat = torch.cat(embedded_features , dim=-1)
-#         return features_cat
-
 class FeaturesCatBlock(nn.Module) :
     """
     将 3 个特征首先进行通道嵌入，然后进行拼接
     """
-    def __init__(self , dim = 64) : 
+    def __init__(self , channel_e , channel_s , channel_r , dim = 64 ) : 
         super().__init__()
-        self.embed_e = FeatureEmbeddingBlock(3 , dim)   # E 环境特征，对应 温度、湿度、风速
-        self.embed_s = FeatureEmbeddingBlock(3 , dim)   # S 系统特征，对应 冷机功率、冷却水温度、冷冻水温度
-        self.embed_r = FeatureEmbeddingBlock(4 , dim)   # R 工况特征，对应 客流量、风机频率、水泵频率、空调设备启停状态
+        self.embed_e = FeatureEmbeddingBlock(channel_e , dim)   # E 环境特征，对应 温度、湿度、风速
+        self.embed_s = FeatureEmbeddingBlock(channel_s , dim)   # S 系统特征，对应 冷机功率、冷却水温度、冷冻水温度
+        self.embed_r = FeatureEmbeddingBlock(channel_r , dim)   # R 工况特征，对应 客流量、风机频率、水泵频率、空调设备启停状态、渗透风量
     
     def forward(self , x_e , x_s , x_r) :
         """
-        x_e : [batch_size , length , 3]
-        x_s : [batch_size , length , 3]
-        x_r : [batch_size , length , 4]
+        x_e : [batch_size , length , channel_e]
+        x_s : [batch_size , length , channel_s]
+        x_r : [batch_size , length , channel_r]
         """
         # 1. 特征内部进行通道融合
         ze = self.embed_e(x_e)

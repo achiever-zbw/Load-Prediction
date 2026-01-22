@@ -7,7 +7,7 @@ class PeriodEnhanceBlock(nn.Module) :
     """
     周期特征增强模块，以 24 小时为一个周期 24 * 60 / 5 = 288
     """
-    def __init__(self , hidden_dim = 64, time_step = 10) :
+    def __init__(self , hidden_dim , time_step) :
         super().__init__()
         self.time_step = time_step
         self.steps = 288

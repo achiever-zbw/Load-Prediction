@@ -106,20 +106,21 @@ def evaluate_main(model, test_loader, device, save_dir):
     3. 计算物理指标 (MAE, RMSE, MAPE)
     4. 可视化
 
-    针对 MainModel 接受 x, x_t, x_w (特征、日周期、周周期)
+    针对 MainModel 接受 x_e, x_s, x_r, x_t (三组特征 + 时间周期)
     """
     model.eval()
     all_preds = []
     all_targets = []
 
-    scaler_y_path = os.path.join(save_dir, "scaler_y.pkl")
-    scaler_y = joblib.load(scaler_y_path)
+    # 加载标准化 Scaler
+    scaler_y = joblib.load(os.path.join(save_dir, "scaler_y.pkl"))
 
     print("开始模型推理")
     with torch.no_grad():
-        for bx, target, bt, bw in test_loader:
-            # MainModel 需要 3 个输入: x, x_t (日周期), x_w (周周期)
-            output = model(bx.to(device), bt.to(device), bw.to(device))
+        for batch_e, batch_s, batch_r, target, batch_t in test_loader:
+            # MainModel 需要 4 个输入: x_e, x_s, x_r (特征), x_t (时间周期)
+            output = model(batch_e.to(device), batch_s.to(device),
+                         batch_r.to(device), batch_t.to(device))
             all_preds.append(output.cpu().numpy())
             all_targets.append(target.numpy())
 
@@ -127,7 +128,7 @@ def evaluate_main(model, test_loader, device, save_dir):
     preds_norm = np.concatenate(all_preds, axis=0).reshape(-1, 1)
     targets_norm = np.concatenate(all_targets, axis=0).reshape(-1, 1)
 
-    # 转化为物理负荷值
+    # 逆标准化: 转换回原始尺度
     preds_real = scaler_y.inverse_transform(preds_norm).flatten()
     targets_real = scaler_y.inverse_transform(targets_norm).flatten()
 
@@ -146,24 +147,26 @@ def evaluate_main(model, test_loader, device, save_dir):
     print(f"R2 分数 : {r2:.4f}")
     print(f"总预测点数: {len(targets_real)}")
 
+    # 每12个点取一个（1小时 = 12个5分钟间隔）
+    step = 12
+    targets_real_hourly = targets_real[::step]
+    preds_real_hourly = preds_real[::step]
+
     # 显示所有数据（不再限制plot_len）
     plt.figure(figsize=(20, 8))
 
-    # 绘制真实值和预测值
-    plt.plot(targets_real, label='Actual Load (真实值)', color='#1f77b4', linewidth=1.2, alpha=0.8)
-    plt.plot(preds_real, label='Predicted Load (预测值)', color='#ff7f0e', linestyle='--', linewidth=1.2, alpha=0.8)
+    # 绘制真实值和预测值（1小时间隔）
+    plt.plot(targets_real_hourly, label='Actual Load', color='#1f77b4', linewidth=1.2, alpha=0.8)
+    plt.plot(preds_real_hourly, label='Predicted Load', color='#ff7f0e', linestyle='--', linewidth=1.2, alpha=0.8)
 
-    # 填充误差区域
-    plt.fill_between(range(len(targets_real)), targets_real, preds_real, color='gray', alpha=0.15, label='误差区域')
-
-    plt.title(f'MainModel - Full Test Set Prediction Comparison ({len(targets_real)} points)', fontsize=14, fontweight='bold')
-    plt.xlabel('Time Steps (5-min intervals)', fontsize=12)
+    plt.title(f'MainModel - Full Test Set Prediction Comparison ({len(targets_real_hourly)} hourly points)', fontsize=14, fontweight='bold')
+    plt.xlabel('Time Steps (1-hour intervals)', fontsize=12)
     plt.ylabel('Cooling Load (kW)', fontsize=12)
     plt.legend(fontsize=11, loc='best')
     plt.grid(True, alpha=0.3)
 
     # 添加指标文本框
-    textstr = f'评估指标:\nMAE: {mae:.2f} kW\nRMSE: {rmse:.2f} kW\nMAPE: {mape:.2f}%'
+    textstr = f'Evaluation Metrics:\nMAE: {mae:.2f} kW\nRMSE: {rmse:.2f} kW\nMAPE: {mape:.2f}%'
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.8)
     plt.text(0.02, 0.98, textstr, transform=plt.gca().transAxes, fontsize=10,
              verticalalignment='top', bbox=props)

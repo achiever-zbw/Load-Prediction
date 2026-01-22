@@ -30,12 +30,11 @@ class LSTMBlock(nn.Module) :
     """
     短时序建模层 , 两层 LSTM 建模
     """
-    def __init__(self , input_dim , hidden_dim , dropout_rate = 0.2) : 
+    def __init__(self , input_dim , hidden_dim) : 
         super().__init__()
         self.lstm1 = nn.LSTM(
             input_size=input_dim , hidden_size=hidden_dim , batch_first=True
         )
-        self.dropout = nn.Dropout(dropout_rate)
         self.lstm2 = nn.LSTM(
             input_size=hidden_dim , hidden_size=hidden_dim , batch_first=True
         )
@@ -46,7 +45,6 @@ class LSTMBlock(nn.Module) :
         """
         # h1 = LSTM1(x)
         out1 , _ = self.lstm1(x)
-        out1 = self.dropout(out1)
 
         # h2 = LSTM2(h1)
         out2 , (h_n2 , c_n2) = self.lstm2(out1)

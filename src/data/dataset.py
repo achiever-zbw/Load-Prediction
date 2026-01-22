@@ -42,11 +42,10 @@ class SubwayDataset(Dataset) :
     def __init__(self , data_e , data_s , data_r , time_index , targets , time_step):
         """
         初始化数据集
-        
         :param self: 说明
-        :param data_e: 环境特征 [N , 3]
-        :param data_s: 系统特征 [N , 3]
-        :param data_r: 工况特征 [N , 4]
+        :param data_e: 环境特征 [N , channel_e]
+        :param data_s: 系统特征 [N , channel_s]
+        :param data_r: 工况特征 [N , channel_r]
         :param time_index: 时间索引 , [N , ] -> 用于周期增强
         :param targets: 目标负荷数据 [N , 1]
         :param time_step: 窗口长度
@@ -78,8 +77,7 @@ class SubwayDataset(Dataset) :
         target = torch.from_numpy(self.targets[index + self.time_step]).float()
         # 返回整个窗口的时间索引序列，形状: [time_step]
         t_idx = torch.from_numpy(self.time_index[index : index + self.time_step]).float()
-
-        return x_e , x_s , x_r , t_idx , target
+        return x_e , x_s , x_r , target , t_idx
 
 class SubwayLoadModel(nn.Module) : 
     """

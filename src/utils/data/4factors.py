@@ -73,7 +73,8 @@ def factors_make() :
 
     # 计算渗透风负荷（只在运营期间）
     wd_load = wind_load(g1_noise , h1 , g2_noise , h2) 
-    df["wind_shen"] = g1_noise + g2_noise
+    df["wind_shen1"] = g1_noise 
+    df["wind_shen2"] = g2_noise
     df.to_csv("data/processed/2_month_data.csv")
     print("原文件已添加渗透风")
 
@@ -114,7 +115,8 @@ def factors_make() :
     g2_base = G2 * door_status_test + G2 * 0.05 * (1 - door_status_test)
     g2_noise = g2_base + np.random.normal(0, 0.5, len(df_test))
     wd_load_test = wind_load(g1_noise , h1 , g2_noise , h2) 
-    df_test["wind_shen"] = g1_noise + g2_noise
+    df_test["wind_shen1"] = g1_noise 
+    df_test["wind_shen2"] = g2_noise
     df_test.to_csv("data/processed/test_shifted.csv")
     print("测试原文件添加渗透风列")
 
